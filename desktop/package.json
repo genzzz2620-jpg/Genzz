@@ -1,0 +1,31 @@
+{
+  "name": "genzz-ai-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Genzz AI Interview Practice desktop application",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node -e \"require('fs').copyFileSync('src/index.html','dist/index.html')\"",
+    "dev": "npm run build && electron .",
+    "start": "electron .",
+    "package:win": "npm run build && electron-builder --win dir zip",
+    "package:win:installer": "npm run build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "electron": "^44.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "com.genzzai.desktop",
+    "productName": "Genzz AI",
+    "protocols": [{ "name": "Genzz AI Desktop Connection", "schemes": ["genzz-ai"] }],
+    "directories": { "output": "dist/package" },
+    "files": ["dist/main.js", "dist/preload.js", "dist/renderer.js", "dist/speech-provider.js", "dist/index.html", "package.json"],
+    "win": { "target": ["dir", "zip"], "signAndEditExecutable": false }
+  }
+}

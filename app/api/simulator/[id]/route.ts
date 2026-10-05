@@ -1,0 +1,6 @@
+import { getServerSession } from 'next-auth';
+import { NextResponse } from 'next/server';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}){
+  const { id } = await params;const auth=await getServerSession(authOptions);if(!auth?.user?.id)return NextResponse.json({error:'Please sign in.'},{status:401});const session=await prisma.interviewSession.findFirst({where:{id:id,userId:auth.user.id,isSimulator:true},include:{resume:{select:{fileName:true}},answers:{select:{id:true,question:true,answer:true,questionType:true,analysisJson:true,simulatorQuestionNumber:true,createdAt:true},orderBy:{createdAt:'asc'}}}});if(!session)return NextResponse.json({error:'Simulation not found.'},{status:404});return NextResponse.json({session:{id:session.id,jobTitle:session.jobTitle,company:session.company,experience:session.experience,jobDescription:session.jobDescription,language:session.language,aiModel:session.aiModel,status:session.status,interviewType:session.simulatorInterviewType,difficulty:session.simulatorDifficulty,questionLimit:session.simulatorQuestionLimit,state:session.simulatorState,feedback:session.simulatorFeedback,resumeName:session.resume?.fileName,answers:session.answers.map(a=>({...a,createdAt:a.createdAt.toISOString()}))}});}

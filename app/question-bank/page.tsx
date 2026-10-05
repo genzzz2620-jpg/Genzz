@@ -1,0 +1,16 @@
+import { getServerSession } from 'next-auth';
+import { redirect } from 'next/navigation';
+import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { QuestionBankClient } from '@/components/question-bank/question-bank-client';
+import { authOptions } from '@/lib/auth';
+
+export default async function QuestionBankPage() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect('/login');
+
+  return (
+    <DashboardShell>
+      <QuestionBankClient />
+    </DashboardShell>
+  );
+}

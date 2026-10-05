@@ -1,0 +1,570 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionType {
+  FREE
+  PREMIUM
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum QuestionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum InterviewStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+}
+
+enum CreditTransactionType {
+  PURCHASE
+  SESSION_RESERVATION
+  SESSION_CONSUMPTION
+  REFUND
+  FREE_SESSION
+  ADJUSTMENT
+}
+
+enum ResumeProcessingStatus {
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AnswerVersionAction {
+  INITIAL
+  REGENERATE
+  SHORTER
+  LONGER
+  SIMPLIFY
+  TECHNICAL
+  FORMAL
+  CONVERSATIONAL
+  BULLET
+  SCRIPT
+  STAR
+  EDIT
+}
+
+enum PreparationTaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum NotificationType {
+  INTERVIEW_COMPLETED
+  FEEDBACK_READY
+  PREPARATION_TASK
+  PREPARATION_PLAN_UPDATED
+  RESUME_PROCESSED
+  RESUME_PROCESSING_FAILED
+  DESKTOP_CONNECTED
+  DESKTOP_DISCONNECTED
+  SUBSCRIPTION_UPDATED
+  PAYMENT_STATUS
+  SECURITY_EVENT
+  SYSTEM_NOTIFICATION
+}
+
+enum NotificationCategory {
+  INTERVIEW
+  PREPARATION
+  RESUME
+  DESKTOP
+  SUBSCRIPTION
+  SECURITY
+  SYSTEM
+}
+
+model User {
+  id               String             @id @default(cuid())
+  name             String
+  email            String             @unique
+  passwordHash     String
+  subscriptionType SubscriptionType   @default(FREE)
+  role             UserRole           @default(USER)
+  accountStatus    AccountStatus      @default(ACTIVE)
+  onboardingStatus OnboardingStatus   @default(COMPLETED)
+  onboardingStep   Int                @default(0)
+  targetRole       String?
+  experienceLevel  String?
+  preferredLanguage String?
+  preferredAnswerFormat String?
+  preferredAIProvider String?
+  lastActiveAt     DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  resumes          Resume[]
+  sessions         InterviewSession[]
+  subscriptions    Subscription[]
+  aiUsages         AIUsage[]
+  desktopConnections DesktopConnection[]
+  questionBankItems QuestionBankItem[]
+  questionFavorites QuestionFavorite[]
+  resumeDocuments   ResumeDocument[]
+  auditLogs         AdminAuditLog[]    @relation("AuditActor")
+  preparationPlans  PreparationPlan[]
+  preparationTasks  PreparationTask[]
+  companyResearch  CompanyResearch[]
+  notifications    Notification[]
+  notificationPreferences NotificationPreference?
+  creditAccount    CreditAccount?
+  creditTransactions CreditTransaction[]
+  creditReservations CreditReservation[]
+  @@index([createdAt])
+  creditCheckouts CreditCheckout[]
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  category  NotificationCategory
+  title     String           @db.VarChar(120)
+  message   String           @db.VarChar(500)
+  readAt    DateTime?
+  actionUrl String?          @db.VarChar(300)
+  eventKey  String?          @db.VarChar(200)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventKey])
+  @@index([userId, readAt, createdAt])
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  interview      Boolean  @default(true)
+  preparation    Boolean  @default(true)
+  resume         Boolean  @default(true)
+  desktop        Boolean  @default(true)
+  subscription   Boolean  @default(true)
+  security       Boolean  @default(true)
+  system         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Resume {
+  id               String                 @id @default(cuid())
+  userId           String
+  fileName         String
+  fileUrl          String?
+  fileType         String?
+  mimeType         String?
+  fileSize         Int?
+  storageKey       String?                @unique
+  extractedText    String?
+  processingStatus ResumeProcessingStatus @default(UPLOADED)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions         InterviewSession[]
+  makerDocuments   ResumeDocument[]
+  companyResearch  CompanyResearch[]
+
+  @@index([userId, createdAt])
+  @@index([userId, processingStatus, createdAt])
+  @@index([processingStatus, updatedAt])
+}
+
+model ResumeDocument {
+  id               String                  @id @default(cuid())
+  userId           String
+  sourceResumeId   String?
+  title            String
+  targetJobTitle   String                  @default("")
+  targetCompany    String                  @default("")
+  jobDescription   String                  @default("")
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceResume     Resume?                 @relation(fields: [sourceResumeId], references: [id], onDelete: SetNull)
+  versions         ResumeDocumentVersion[]
+
+  @@index([userId, updatedAt])
+}
+
+model ResumeDocumentVersion {
+  id          String        @id @default(cuid())
+  documentId  String
+  version     Int
+  content     Json
+  createdAt   DateTime      @default(now())
+  document    ResumeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, version])
+  @@index([documentId, createdAt])
+}
+
+model InterviewSession {
+  id                 String            @id @default(cuid())
+  userId             String
+  company            String
+  jobTitle           String
+  experience         String?
+  jobDescription     String?
+  resumeId           String?
+  language           String
+  answerLength       String
+  answerFormat       String
+  tone               String
+  aiModel            String
+  technicalDepth     String            @default("STANDARD")
+  isSimulator        Boolean           @default(false)
+  simulatorInterviewType String?
+  simulatorDifficulty String?
+  simulatorQuestionLimit Int?
+  simulatorState     Json?
+  simulatorFeedback  Json?
+  creditUnits        Int               @default(0)
+  freePractice       Boolean           @default(false)
+  practiceExpiresAt  DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  durationSeconds    Int?
+  customInstructions String?
+  status             InterviewStatus   @default(DRAFT)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume             Resume?           @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  answers            InterviewAnswer[]
+  aiUsages           AIUsage[]
+  desktopConnections DesktopConnection[]
+  preparationTasks   PreparationTask[]
+
+  @@index([userId, createdAt])
+  @@index([userId, status, startedAt])
+  @@index([userId, jobTitle, startedAt])
+  @@index([userId, company, startedAt])
+}
+
+model DesktopConnection {
+  id                String           @id @default(cuid())
+  userId            String
+  sessionId         String
+  codeHash          String?          @unique
+  codeExpiresAt     DateTime?
+  tokenHash         String?          @unique
+  tokenExpiresAt    DateTime?
+  connectedAt       DateTime?
+  revokedAt         DateTime?
+  createdAt         DateTime         @default(now())
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session           InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sessionId, revokedAt])
+  @@index([codeExpiresAt])
+  @@index([tokenExpiresAt])
+}
+
+model QuestionBankItem {
+  id              String             @id @default(cuid())
+  userId          String?
+  question        String
+  category        String
+  questionType    String?
+  subcategory     String?
+  difficulty      String?
+  experienceLevel String?
+  technology      String?
+  company         String?
+  jobRole         String?
+  tags            String[]           @default([])
+  explanation     String?
+  isAiGenerated   Boolean            @default(false)
+  status          QuestionStatus     @default(PUBLISHED)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  user            User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favorites       QuestionFavorite[]
+  answers         InterviewAnswer[]
+  preparationTasks PreparationTask[]
+
+  @@index([userId, createdAt])
+  @@index([category])
+  @@index([difficulty])
+  @@index([company])
+  @@index([jobRole])
+  @@index([createdAt])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  details    Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId, createdAt])
+}
+
+model QuestionFavorite {
+  id         String          @id @default(cuid())
+  userId     String
+  questionId String
+  createdAt  DateTime        @default(now())
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   QuestionBankItem @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId, createdAt])
+}
+
+model InterviewAnswer {
+  id          String           @id @default(cuid())
+  sessionId   String
+  question    String
+  answer      String
+  questionType String?
+  simulatorQuestionNumber Int?
+  analysisJson Json?
+  questionBankItemId String?
+  createdAt   DateTime         @default(now())
+  session     InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionBankItem QuestionBankItem? @relation(fields: [questionBankItemId], references: [id], onDelete: SetNull)
+  versions    AnswerVersion[]
+
+  @@index([sessionId, createdAt])
+  @@index([sessionId, questionType, createdAt])
+  @@index([questionBankItemId])
+  @@unique([sessionId, simulatorQuestionNumber])
+}
+
+model AnswerVersion {
+  id                String              @id @default(cuid())
+  interviewAnswerId String
+  answer            String
+  provider          String
+  model             String
+  versionNumber     Int
+  action            AnswerVersionAction
+  validationWarnings Json?
+  createdAt         DateTime            @default(now())
+  interviewAnswer   InterviewAnswer    @relation(fields: [interviewAnswerId], references: [id], onDelete: Cascade)
+
+  @@unique([interviewAnswerId, versionNumber])
+}
+
+model AIUsage {
+  id            String           @id @default(cuid())
+  userId        String
+  sessionId     String?
+  provider      String
+  model         String
+  inputTokens   Int?
+  outputTokens  Int?
+  feature       String           @default("INTERVIEW_ANSWER")
+  status        String
+  createdAt     DateTime         @default(now())
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session       InterviewSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
+}
+
+model PreparationPlan {
+  id               String   @id @default(cuid())
+  userId           String
+  title            String
+  targetRole       String
+  targetCompany    String?
+  experienceLevel  String
+  jobDescription   String?
+  resumeId         String?
+  durationDays     Int
+  status           String   @default("ACTIVE")
+  overview         String   @default("")
+  focusAreas       String[] @default([])
+  technicalTopics  String[] @default([])
+  behavioralTopics String[] @default([])
+  resumeTopics     String[] @default([])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks            PreparationTask[]
+
+  @@index([userId, status, updatedAt])
+}
+
+model PreparationTask {
+  id                String                @id @default(cuid())
+  planId            String
+  userId            String
+  title             String
+  description       String                @default("")
+  category          String
+  priority          String                @default("MEDIUM")
+  status            PreparationTaskStatus @default(NOT_STARTED)
+  scheduledDate     DateTime
+  estimatedMinutes  Int                   @default(20)
+  relatedQuestionId String?
+  relatedSessionId  String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  plan              PreparationPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relatedQuestion   QuestionBankItem?     @relation(fields: [relatedQuestionId], references: [id], onDelete: SetNull)
+  relatedSession    InterviewSession?     @relation(fields: [relatedSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, scheduledDate, status])
+  @@index([planId, scheduledDate])
+}
+
+model CompanyResearch {
+  id                 String   @id @default(cuid())
+  userId             String
+  resumeId           String?
+  companyName        String?
+  targetRole         String
+  experienceLevel    String
+  location           String?
+  jobDescription     String   @default("")
+  publicInformation  String   @default("")
+  sourceTitle        String?
+  sourceUrl          String?
+  aiModel            String
+  analysis           Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume             Resume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt])
+  @@index([userId, companyName, targetRole])
+}
+
+model Subscription {
+  id                     String           @id @default(cuid())
+  userId                 String
+  plan                   SubscriptionPlan @default(FREE)
+  status                 String           @default("ACTIVE")
+  provider               String?
+  providerCustomerId     String?
+  providerSubscriptionId String?          @unique
+  startDate              DateTime         @default(now())
+  endDate                DateTime?
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean          @default(false)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([providerCustomerId])
+}
+
+// 100 integer units equal one displayed credit. Ledger amounts are signed integer units.
+model CreditAccount {
+  id             String               @id @default(cuid())
+  userId         String               @unique
+  balanceUnits   Int                  @default(0)
+  reservedUnits  Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   CreditTransaction[]
+  reservations   CreditReservation[]
+}
+
+model CreditTransaction {
+  id              String                @id @default(cuid())
+  userId          String
+  accountId       String
+  type            CreditTransactionType
+  amountUnits     Int
+  idempotencyKey  String                @unique
+  sessionId       String?
+  metadata        Json?
+  createdAt       DateTime              @default(now())
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account         CreditAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([sessionId, type])
+}
+
+model CreditReservation {
+  id             String         @id @default(cuid())
+  userId         String
+  accountId      String
+  sessionId      String         @unique
+  amountUnits    Int
+  status         String         @default("RESERVED")
+  idempotencyKey String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account        CreditAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+}
+
+model CreditCheckout {
+  id                 String   @id @default(cuid())
+  userId             String
+  providerCheckoutId String   @unique
+  packId             String
+  amountUnits        Int
+  status             String   @default("PENDING")
+  createdAt          DateTime @default(now())
+  completedAt        DateTime?
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model BillingWebhookEvent {
+  id        String   @id
+  type      String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
