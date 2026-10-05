@@ -1,6 +1,6 @@
 # Render Staging Deployment
 
-> **STAGING ONLY.** This runbook provisions a separate Render staging service and Render PostgreSQL database. Never connect it to production, reuse production credentials, or copy production data. No Render resource or source repository is currently configured for this project.
+> **STAGING ONLY.** This runbook provisions a separate Render staging service and Render PostgreSQL database. Never connect it to production, reuse production credentials, or copy production data. The source repository and staging branch are configured; Render resources have not yet been created.
 
 ## Architecture
 
@@ -21,6 +21,10 @@ Production remains on its own host, database, storage, and credentials. Do not c
 
 ## Compatibility and commands
 
+- Service name: `genz-staging`.
+- Source: GitHub repository `https://github.com/genzzz2620-jpg/Genzz.git`, branch `staging`.
+- Region: Singapore for both the Web Service and its staging PostgreSQL database.
+- Instance count: one Web Service instance while resume storage uses a local persistent disk.
 - Runtime: Node.js 24. `package.json` requires `^24.0.0`; `.npmrc` enables strict engine checks. Pin the Render service to Node 24 (or set `NODE_VERSION` to a compatible 24.x release) instead of relying on a moving default.
 - Package manager: npm, using the root `package-lock.json` (lockfile version 3). The repository does not pin an npm version.
 - Build command: `npm ci && npx prisma generate && npm run deploy:check && npm run build`
@@ -34,18 +38,18 @@ Render's current setup details are documented in its guides for [Node.js version
 
 ## 1. Prepare source control
 
-Render must be able to fetch this project from a Git provider. This workspace has no `.git` metadata and Git is unavailable, so it cannot currently be connected to Render as a repository. The owner must create or identify an approved private GitHub, GitLab, or Bitbucket repository, initialize/commit/push this reviewed project using their normal source-control process, and connect Render to that repository. Do not publish the source or create a repository without owner authorization.
+Render must be connected to the confirmed GitHub repository `https://github.com/genzzz2620-jpg/Genzz.git`. Configure the Web Service to deploy the existing `staging` branch at its latest reviewed commit. Do not select `main` or create another repository.
 
 Choose a dedicated staging branch (for example, the team's existing staging branch) and configure the Web Service to deploy only that branch. Do not select the production branch unless that is the owner's explicit release strategy. Keep repository access limited to the Render workspace and intended maintainers.
 
 ## 2. Provision isolated Render resources
 
-In the intended Render workspace and region:
+In the Render workspace, select the Singapore region for both staging resources:
 
 1. Create a new **Render PostgreSQL** instance specifically for staging. Give it a clearly staging-only name. Do not attach or reuse any production database.
 2. Select a PostgreSQL version supported by Prisma and an instance plan with the backup/recovery capability required by the staging data policy. Configure and document the backup retention and restore procedure; verify a backup/restore path before migrations. Render's free PostgreSQL plan does not provide logical backups.
 3. Keep the database private. For a Render Web Service in the same region, configure `DATABASE_URL` from the database's **internal** connection URL. Render's internal URL uses its private network; TLS is required for external connections, which are unnecessary for this same-region service. Do not expose the database to public ingress. Use an external TLS URL only for an explicitly approved external operator connection.
-4. Create a Render **Web Service** from the connected repository and staging branch. Choose the Node runtime, same region as the database, the build command above, start command `npm start`, and health check path `/api/health`.
+4. Create the `genz-staging` Render **Web Service** from the connected repository's `staging` branch. Choose the Node runtime, Singapore region, one instance, the build command above, start command `npm start`, and health check path `/api/health`.
 5. Add a Render persistent disk to this single service with mount path `/var/data`. Set `RESUME_STORAGE_DIR=/var/data/genz-resumes`. The implementation creates the configured directory and files with restrictive modes. Only files beneath the mount path persist; this disk is private to this one service instance. Keep the service at one instance while using local-disk resume storage. Disk-backed services have deploy downtime and cannot use zero-downtime deploys; do not scale this service horizontally without first replacing local-file storage with a shared private storage adapter.
 6. Use the Render-assigned `*.onrender.com` HTTPS hostname initially. Do not guess or type a hostname before Render assigns it. Set `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` to that exact same HTTPS origin, with no path/query/fragment. If a custom staging domain is added later, wait for its HTTPS certificate and update both variables to that exact origin, then rebuild/redeploy.
 7. Store all app secrets as Render service environment variables (or an appropriately scoped Render environment group). Do not add populated environment files to the repository. Keep database and provider secrets server-side; only `NEXT_PUBLIC_APP_URL` is public and it contains the origin, not a secret.
@@ -90,13 +94,13 @@ The current app has no email provider configuration. `PORT` is supplied by Rende
 
 ## 5. Blueprint decision and current stop point
 
-No `render.yaml` is included at this stage. A safe Blueprint would need the approved source repository/branch and owner decisions for database/service names, region, plan, disk size, and other resource settings. The database password and application secrets must remain outside source control. After those identifiers and choices exist, an owner-reviewed Blueprint can reference secrets as Render-managed values without embedding secret contents.
+No `render.yaml` is included at this stage. The repository, branch, service name, and region are confirmed above. Plan, disk size, backup retention, and other account-specific resource settings must be selected in Render before provisioning. The database password and application secrets must remain outside source control. An owner-reviewed Blueprint can reference secrets as Render-managed values without embedding secret contents.
 
-**Current status: READY FOR RENDER PROVISIONING.** No source repository, Render PostgreSQL instance, Web Service, persistent disk, staging hostname, or staging credentials are available in this workspace. Do not deploy, migrate, or call OpenAI until the owner provisions them and connects the approved repository.
+**Current status: READY FOR RENDER CONNECTION.** The source repository and staging branch are available. No Render PostgreSQL instance, Web Service, persistent disk, staging hostname, or staging credentials are available in this workspace. Do not deploy, migrate, or call OpenAI until Render is connected and the staging resources and secrets are configured.
 
 ## Owner actions
 
-1. Create or identify the approved private source repository; push the reviewed project and Phase 34 deployment documentation through the normal Git workflow, then connect Render to that repository and a dedicated staging branch.
-2. In Render, create an isolated staging PostgreSQL instance in the chosen region with a supported plan and backup/recovery capability; create a Node.js Web Service in the same region and attach a persistent disk mounted at `/var/data`.
+1. Connect Render to `https://github.com/genzzz2620-jpg/Genzz.git` and select the existing `staging` branch.
+2. In Render, create an isolated staging PostgreSQL instance in Singapore with a supported plan and backup/recovery capability; create the `genz-staging` Node.js Web Service in Singapore and attach a persistent disk mounted at `/var/data`.
 3. Set the build/start commands, `/api/health` health check, and required environment variables in the Web Service. Use the database's internal URL and Render-assigned HTTPS origin; generate a unique staging auth secret and configure the authorized staging OpenAI key directly in Render.
 4. Deploy the staging branch. Verify the database identity and backup before applying migrations, then perform the migration, health, auth, resume persistence, provider, and staging Playwright checks above.

@@ -4,9 +4,9 @@
 
 ## Current project support
 
-The repository currently has no staging application URL, hosting provider, CI/CD workflow, web-app Dockerfile, or staging deployment manifest. `compose.yaml` provides a local PostgreSQL service only. Use Node.js 24 LTS, declared by `package.json` (`engines.node: ^24.0.0`) and checked strictly by `.npmrc`; Node.js 20 is end-of-life ([official release schedule](https://nodejs.org/en/about/previous-releases)). The app can build and start as a Node.js service with `npm run build` and `npm start`; Prisma reads `DATABASE_URL`; `/api/health` and `/api/health/db` provide liveness and database checks. Playwright requires `E2E_ENVIRONMENT=staging`, refuses production-looking host names, and requires HTTPS plus exact-host confirmation for remote targets.
+The repository currently has no staging application URL, CI/CD workflow, web-app Dockerfile, or staging deployment manifest. Render is the selected host for GENZ staging; no Render resources have been provisioned yet. `compose.yaml` provides a local PostgreSQL service only. Use Node.js 24 LTS, declared by `package.json` (`engines.node: ^24.0.0`) and checked strictly by `.npmrc`; Node.js 20 is end-of-life ([official release schedule](https://nodejs.org/en/about/previous-releases)). The app can build and start as a Node.js service with `npm run build` and `npm start`; Prisma reads `DATABASE_URL`; `/api/health` and `/api/health/db` provide liveness and database checks. Playwright requires `E2E_ENVIRONMENT=staging`, refuses production-looking host names, and requires HTTPS plus exact-host confirmation for remote targets.
 
-The hosting provider has not been selected. The simplest provider-neutral staging shape is:
+The Render deployment uses the following provider-neutral staging shape:
 
 1. A private Node.js web service built from the reviewed project revision.
 2. A separate staging PostgreSQL instance/database with its own least-privilege credentials and private network access from that service.
@@ -15,7 +15,7 @@ The hosting provider has not been selected. The simplest provider-neutral stagin
 5. An HTTPS staging hostname and dedicated disposable test accounts.
 6. A separate test runner configured with the staging URL and exact-host E2E guard.
 
-Choose the hosting and database providers as an owner decision. Do not treat a local database, local app, or local Compose test as staging certification.
+Use the Render deployment runbook for resource settings. Do not treat a local database, local app, or local Compose test as staging certification.
 
 Compare the neutral deployment models in [STAGING_PROVIDER_OPTIONS.md](STAGING_PROVIDER_OPTIONS.md) and track provisioning in [STAGING_DEPLOYMENT_CHECKLIST.md](STAGING_DEPLOYMENT_CHECKLIST.md).
 
