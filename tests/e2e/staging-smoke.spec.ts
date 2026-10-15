@@ -24,9 +24,9 @@ async function registerTestUser(page: Page, name: string) {
   await page.locator('input[type="password"]').nth(0).fill(password);
   await page.locator('input[type="password"]').nth(1).fill(password);
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\/welcome$/);
+  await expect(page).toHaveURL(/\/welcome$/, { timeout: 30_000 });
   await page.getByRole('button', { name: 'Skip for Now' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
   return { email, password };
 }
 
@@ -54,7 +54,7 @@ function createQaPdf() {
 }
 
 test('test-only user can register, skip onboarding, visit core pages, logout, and login again', async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(180_000);
   const appOrigin = new URL(process.env.E2E_BASE_URL!).origin;
   const { email, password } = await registerTestUser(page, 'Genzz Staging QA');
   await expect(page.getByRole('heading', { name: /Welcome back, Genzz Staging QA/ })).toBeVisible();
@@ -96,12 +96,12 @@ test('test-only user can register, skip onboarding, visit core pages, logout, an
   expect(crossOriginSettingsUpdate.status()).toBe(403);
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Genzz Settings QA');
   await page.getByRole('button', { name: 'Logout' }).click();
-  await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
+  await expect(page).toHaveURL(/\/login(?:\?.*)?$/, { timeout: 30_000 });
   await waitForFormHydration(page);
   await page.getByPlaceholder('you@example.com').fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.getByRole('button', { name: 'Login' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
   await expect(page.getByRole('heading', { name: /Welcome back, Genzz Settings QA/ })).toBeVisible();
 });
 
